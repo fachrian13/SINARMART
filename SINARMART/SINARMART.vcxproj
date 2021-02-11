@@ -140,6 +140,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Barang.h" />
     <ClInclude Include="User.h" />
   </ItemGroup>
   <ItemGroup>

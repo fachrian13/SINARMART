@@ -6,13 +6,17 @@ using System::Color;
 using System::ConsoleColor;
 using System::Console;
 using System::Exception;
+using System::Time;
 using Utility::Cipher;
 using Utility::ConsoleMenu;
+using Utility::ConsoleTable;
+using Utility::Convert;
 using Utility::Message;
 using Utility::Result;
 using Utility::Tools;
 
 #include "User.h"
+#include "Barang.h"
 
 const ConsoleColor $CursorColor{ Color::Green, Color::Black };
 const String $Key{ "SINARMART" };
@@ -71,7 +75,7 @@ void Registrasi() {
 			else if (password != password2)
 				Tools::PrintMessage(2, 13, Message::Information, "Password tidak sama.");
 			else {
-				DataUser data;
+				DatabaseUser data;
 				data.Blocked = false;
 				strcpy_s(data.Username, username.c_str());
 				strcpy_s(data.Password, Cipher::Vigenere(password, $Key).c_str());
@@ -84,8 +88,7 @@ void Registrasi() {
 		}
 	} while (sRegistrasi.Second != "[Kembali]");
 }
-
- Result<bool, DataUser> Masuk() {
+Result<bool, DatabaseUser> Masuk() {
 	ConsoleMenu mMasuk{
 		{
 			"Username :",
@@ -125,7 +128,7 @@ void Registrasi() {
 			if (username.empty() || password.empty())
 				Tools::PrintMessage(2, 12, Message::Warning, "Silakan lengkapi semua data.");
 			else {
-				DataUser data = $User.Read()[0];
+				DatabaseUser data = $User.Read()[0];
 
 				if (strcmp(data.Username, username.c_str()) != 0)
 					Tools::PrintMessage(2, 12, Message::Information, "Username tidak terdaftar.");
@@ -140,16 +143,181 @@ void Registrasi() {
 	return{ 0, {} };
 }
 
- void Dashboard(DataUser dataUser) {
-	 Console::Print(dataUser.Username);
+void TambahBarang() {
+	ConsoleMenu mTambah{
+		{
+			"Nama barang  :",
+			"Kategori     :",
+			"Harga barang :",
+			"Keterangan   :",
+			"[Tambah]",
+			"[Kembali]"
+		},
+		$CursorColor,
+		{2, 6}
+	};
+	ConsoleMenu::Selection sTambah;
+	String nama;
+	String kategori;
+	String harga;
+	String keterangan;
 
-	 Console::GetKey();
- }
+	do {
+		Tools::Print(2, 2, "========================");
+		Tools::Print(2, 3, "   TAMBAH DATA BARANG");
+		Tools::Print(2, 4, "========================");
+		
+		sTambah = mTambah.Print();
+
+		switch (sTambah.First) {
+		case 0:
+			Console::Print(" ");
+			Tools::Clear(Console::GetCursorPosition(), nama);
+			nama = Console::GetLine();
+			break;
+		case 1:
+			Console::Print(" ");
+			Tools::Clear(Console::GetCursorPosition(), kategori);
+			kategori = Console::GetLine();
+			break;
+		case 2:
+			Console::Print(" ");
+			Tools::Clear(Console::GetCursorPosition(), harga);
+			harga = Tools::GetNumber();
+			break;
+		case 3:
+			Console::Print(" ");
+			Tools::Clear(Console::GetCursorPosition(), keterangan);
+			keterangan = Console::GetLine();
+			break;
+		}
+
+		if (sTambah.Second == "[Tambah]") {
+			if (nama.empty() || kategori.empty() || harga.empty())
+				Tools::PrintMessage(2, 13, Message::Warning, "Silakan lengkapi semua data.");
+			else if (!Tools::IsNumber(harga))
+				Tools::PrintMessage(2, 13, Message::Warning, "Harga barang berupa angka.");
+			else {
+				DatabaseBarang data;
+				String sId = Convert::ToString($Barang.GetId());
+
+				data.Id = !$Barang.Empty() ? Convert::ToInt32(sId.replace(3, -1, Convert::ToString(Convert::ToInt32(sId.substr(3)) + 1))) : 1001;
+				strcpy_s(data.Date, Time::Now().StandardFormat().c_str());
+				strcpy_s(data.NamaBarang, nama.c_str());
+				strcpy_s(data.Kategori, kategori.c_str());
+				data.Harga = Convert::ToUint64(harga);
+				strcpy_s(data.Keterangan, keterangan.c_str());
+
+				$Barang.Write(data);
+
+				Tools::PrintMessage(2, 13, Message::Information, "Data barang berhasil ditambahkan.");
+				break;
+			}
+		}
+	} while (sTambah.Second != "[Kembali]");
+}
+void TampilkanBarang() {
+	ConsoleTable tBarang{
+		"No",
+		"Id Barang",
+		"Tanggal Penambahan",
+		"Nama Barang",
+		"Kategori",
+		"Harga",
+		"Keterangan"
+	};
+	Vector<DatabaseBarang> stored = $Barang.Read();
+
+	for (SizeType i = 0, no = 1; i < stored.size(); i++, no++)
+		tBarang += {
+		Convert::ToString(no),
+		Convert::ToString(stored[i].Id),
+		stored[i].Date,
+		stored[i].NamaBarang,
+		stored[i].Kategori,
+		"Rp. " + Convert::ToString(stored[i].Harga) + ",-",
+		stored[i].Keterangan
+	};
+
+	Tools::Print(2, 2, "=============================");
+	Tools::Print(2, 3, "   DAFTAR BARANG DI GUDANG");
+	Tools::Print(2, 4, "=============================");
+
+	Console::SetCursorPosition(0, 6); tBarang.Print();
+}
+void DataBarang() {
+	ConsoleMenu mBarang{
+		{
+			"1. Tambah data barang",
+			"2. Tampilkan semua data",
+			"3. Cari data",
+			"4. Update data",
+			"5. Hapus data barang",
+			"[Kembali]"
+		},
+		$CursorColor,
+		{2, 6}
+	};
+	ConsoleMenu::Selection sBarang;
+
+	do {
+		Tools::Print(2, 2, "=================");
+		Tools::Print(2, 3, "   DATA BARANG");
+		Tools::Print(2, 4, "=================");
+
+		sBarang = mBarang.Print();
+
+		switch (sBarang.First) {
+		case 0:
+			Console::Clear();
+			TambahBarang();
+			Console::Clear();
+			break;
+		case 1:
+			Console::Clear();
+			TampilkanBarang();
+			Console::Clear();
+			break;
+		}
+	} while (sBarang.Second != "[Kembali]");
+}
+
+void Dashboard(DatabaseUser userData) {
+	ConsoleMenu mDashboard{
+		{
+			"1. Data barang",
+			"2. Data pelanggan",
+			"3. Data pengguna",
+			"[Kembali]"
+		},
+		$CursorColor,
+		{2, 7}
+	};
+	ConsoleMenu::Selection sDashboard;
+
+	do {
+		Tools::Print(2, 2, "===============");
+		Tools::Print(2, 3, "   SINARMART");
+		Tools::Print(2, 4, "===============");
+		Tools::Print(2, 5, "Jl. Karaton, No.58, RT.05, RW.08, Cigembor, Ciamis.");
+
+		sDashboard = mDashboard.Print();
+
+		switch (sDashboard.First) {
+		case 0:
+			Console::Clear();
+			DataBarang();
+			Console::Clear();
+			break;
+		}
+
+	} while (sDashboard.Second != "[Kembali]");
+}
 
 int main() {
 	try {
 		/* Configure windows layout */ {
-			Console::SetFont(L"Jetbrains Mono", 18);
+			Console::SetFont(L"Consolas", 18);
 			Console::SetSize(120, 30);
 			Console::DisableMaximizeButton();
 			Console::DisableResize();
@@ -162,8 +330,10 @@ int main() {
 
 		Console::Clear();
 		Result masuk = Masuk();
-		if (masuk.First)
-			Console::Clear(), Dashboard(masuk.Second);
+		if (masuk.First) {
+			Console::Clear();
+			Dashboard(masuk.Second);
+		}
 	}
 	catch (Exception& e) {
 		Console::Clear();
@@ -176,7 +346,7 @@ int main() {
 		);
 		Console::GetKey();
 
-		return -1;
+		return EXIT_FAILURE;
 	}
 	catch (std::exception& e) {
 		Console::Clear();
@@ -186,8 +356,8 @@ int main() {
 		);
 		Console::GetKey();
 
-		return -1;
+		return EXIT_FAILURE;
 	}
 
-	return 0;
+	return EXIT_SUCCESS;
 }
