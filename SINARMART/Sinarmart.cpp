@@ -20,7 +20,8 @@ using Utility::Tools;
 
 const ConsoleColor $CursorColor{ Color::Green, Color::Black };
 const String $Key{ "SINARMART" };
-const Regex $Standard{ "[a-zA-Z0-9]+" };
+const Regex $StandardEx{ "[a-zA-Z0-9]+" };
+const Regex $IdBarangEx{ "\\b(100)([^ ]*)" };
 
 void Registrasi() {
 	ConsoleMenu mRegistrasi{
@@ -68,7 +69,7 @@ void Registrasi() {
 		if (sRegistrasi.Second == "[Registrasi]") {
 			if (username.empty() || password.empty() || password2.empty())
 				Tools::PrintMessage(2, 13, Message::Warning, "Silakan lengkapi semua data.");
-			else if (!regex_match(username, $Standard) || !regex_match(password, $Standard))
+			else if (!regex_match(username, $StandardEx) || !regex_match(password, $StandardEx))
 				Tools::PrintMessage(2, 13, Message::Warning, "Username dan password hanya menggunakan huruf dan angka.");
 			else if (username.length() < 6 || username.length() > 15 || password.length() < 6 || password.length() > 15)
 				Tools::PrintMessage(2, 13, Message::Information, "Panjang username dan password 6-15 karakter.");
@@ -156,6 +157,28 @@ void TambahBarang() {
 		$CursorColor,
 		{2, 6}
 	};
+	ConsoleMenu mKategori{
+		{
+			"Sabun Cuci",
+			"Sabun Mandi",
+			"Rokok",
+			"Minuman Botol",
+			"Minuman Kaleng",
+			"Minuman Gelas",
+			"Sikat Gigi",
+			"Kopi Sachet",
+			"Susu Sachet",
+			"Alat Sekolah",
+			"Elektronik",
+			"Makanan Ringan",
+			"Roti",
+			"Mainan Anak",
+			"Kebutuhan Rumah Tangga"
+		},
+		$CursorColor,
+		{17, 7},
+		true
+	};
 	ConsoleMenu::Selection sTambah;
 	String nama;
 	String kategori;
@@ -166,6 +189,11 @@ void TambahBarang() {
 		Tools::Print(2, 2, "========================");
 		Tools::Print(2, 3, "   TAMBAH DATA BARANG");
 		Tools::Print(2, 4, "========================");
+
+		Tools::Print(17, 6, nama);
+		Tools::Print(17, 7, kategori);
+		Tools::Print(17, 8, harga);
+		Tools::Print(17, 9, keterangan);
 		
 		sTambah = mTambah.Print();
 
@@ -178,7 +206,8 @@ void TambahBarang() {
 		case 1:
 			Console::Print(" ");
 			Tools::Clear(Console::GetCursorPosition(), kategori);
-			kategori = Console::GetLine();
+			kategori = mKategori.Print(5).Second;
+			mKategori.Clear();
 			break;
 		case 2:
 			Console::Print(" ");
@@ -245,6 +274,120 @@ void TampilkanBarang() {
 
 	Console::SetCursorPosition(0, 6); tBarang.Print();
 }
+void CariBarang() {
+	ConsoleMenu mCari{
+		{
+			"Id/Nama Barang :",
+			"[Cari]",
+			"[Kembali]"
+		},
+		$CursorColor,
+		{2, 7}
+	};
+	ConsoleMenu::Selection sCari;
+	String cari;
+
+	do {
+		Tools::Print(2, 2, "======================");
+		Tools::Print(2, 3, "   CARI DATA BARANG");
+		Tools::Print(2, 4, "======================");
+		Tools::Print(2, 5, "Silakan masukkan Id atau Nama barang.");
+
+		sCari = mCari.Print();
+
+		switch (sCari.First) {
+		case 0:
+			Console::Print(" ");
+			Tools::Clear(Console::GetCursorPosition(), cari);
+			cari = Console::GetLine();
+			break;
+		}
+
+		if (sCari.Second == "[Cari]") {
+			if (cari.empty())
+				Tools::PrintMessage(2, 11, Message::Warning, "Silakan isi barang yang akan dicari.");
+			else {
+				Vector<DatabaseBarang> dataBarang = $Barang.Read();
+
+				if (Tools::IsNumber(cari)) {
+					if (!regex_match(cari, $IdBarangEx))
+						Tools::PrintMessage(2, 11, Message::Warning, "Id barang salah.");
+					else {
+						long lId = Convert::ToLong(cari);
+						Result<bool, DatabaseBarang> result{ false, {} };
+
+						for (SizeType i = 0; i < dataBarang.size(); i++)
+							if (lId == dataBarang[i].Id) {
+								result = { true, dataBarang[i] };
+								break;
+							}
+
+						if (!result.First)
+							Tools::PrintMessage(2, 11, Message::Information, "Barang dengan ID: " + cari + " tidak ditemukan.");
+						else {
+							ConsoleTable tBarang{
+								"Id Barang",
+								"Tanggal Penambahan",
+								"Nama Barang",
+								"Kategori",
+								"Harga",
+								"Keterangan"
+							};
+							tBarang += {
+								Convert::ToString(result.Second.Id),
+								result.Second.Date,
+								result.Second.NamaBarang,
+								result.Second.Kategori,
+								"Rp. " + Convert::ToString(result.Second.Harga) + ",-",
+								result.Second.Keterangan
+							};
+
+							Console::Print("\n\n\n");
+							tBarang.Print();
+						}
+					}
+				}
+				else {
+					ConsoleTable tBarang{
+						"No",
+						"Id Barang",
+						"Tanggal Penambahan",
+						"Nama Barang",
+						"Kategori",
+						"Harga",
+						"Keterangan"
+					};
+					Vector<DatabaseBarang> result;
+					String lowCari = cari;
+					
+					std::transform(lowCari.begin(), lowCari.end(), lowCari.begin(), ::tolower);
+					for (DatabaseBarang index : dataBarang) {
+						String lowData = index.NamaBarang;
+
+						std::transform(lowData.begin(), lowData.end(), lowData.begin(), ::tolower);
+						if (lowData.find(lowCari) != -1)
+							result.push_back(index);
+					}
+
+					for (SizeType i = 0, no = 1; i < result.size(); i++, no++)
+						tBarang += {
+						Convert::ToString(no),
+						Convert::ToString(result[i].Id),
+						result[i].Date,
+						result[i].NamaBarang,
+						result[i].Kategori,
+						"Rp. " + Convert::ToString(result[i].Harga) + ",-",
+						result[i].Keterangan
+					};
+
+					Console::Print("\n\n\n");
+					tBarang.Print();
+				}
+			}
+		}
+	} while (sCari.Second != "[Kembali]");
+
+}
 void DataBarang() {
 	ConsoleMenu mBarang{
 		{
@@ -276,6 +419,11 @@ void DataBarang() {
 		case 1:
 			Console::Clear();
 			TampilkanBarang();
+			Console::Clear();
+			break;
+		case 2:
+			Console::Clear();
+			CariBarang();
 			Console::Clear();
 			break;
 		}
